@@ -1,0 +1,17 @@
+{
+  "name": "murang-vr-web3",
+  "version": "1.0.0",
+  "private": true,
+  "description": "VR 리듬게임 Web3 보상 시스템 — Sepolia 배포 스크립트",
+  "scripts": {
+    "compile": "hardhat compile",
+    "deploy": "hardhat run scripts/deploy.js --network sepolia",
+    "balance": "hardhat run scripts/balance.js --network sepolia"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.5",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.0",
+    "hardhat": "^2.22.0"
+  }
+}

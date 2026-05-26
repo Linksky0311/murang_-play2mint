@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MURANG — VR 리듬게임 Web3 보상 데모</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-0: #0a0a14;
+    --bg-1: #11111f;
+    --bg-2: #1a1a2e;
+    --border: #2a2a44;
+    --text: #e8e8f0;
+    --muted: #8a8aa0;
+    --primary: #7c5cff;
+    --primary-soft: #a98aff;
+    --success: #2dd4a4;
+    --warn: #f5b14b;
+    --danger: #ff5d73;
+    --accent: #00d4ff;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: radial-gradient(ellipse at top, #1a1535 0%, var(--bg-0) 60%);
+    color: var(--text);
+    font-family: 'Pretendard', -apple-system, sans-serif;
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  body { padding: 24px; max-width: 1280px; margin: 0 auto; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--border);
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 20px; color: white;
+    box-shadow: 0 8px 24px rgba(124, 92, 255, 0.4);
+  }
+  .brand h1 { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+  .brand p { font-size: 12px; color: var(--muted); }
+
+  .wallet-area { display: flex; align-items: center; gap: 12px; }
+  .mode-toggle {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 4px; display: flex;
+  }
+  .mode-toggle button {
+    padding: 6px 14px; border-radius: 999px; border: none;
+    background: transparent; color: var(--muted); cursor: pointer;
+    font-size: 12px; font-weight: 600;
+  }
+  .mode-toggle button.active {
+    background: var(--primary); color: white;
+  }
+  .btn {
+    padding: 10px 18px; border-radius: 10px; border: none;
+    font-family: inherit; font-weight: 600; font-size: 14px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-soft); transform: translateY(-1px); }
+  .btn-ghost { background: var(--bg-2); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover:not(:disabled) { border-color: var(--primary); }
+  .btn-success { background: var(--success); color: #0a0a14; }
+  .btn-danger { background: var(--danger); color: white; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--bg-1); border: 1px solid var(--border);
+    border-radius: 16px; padding: 22px;
+  }
+  .card h2 {
+    font-size: 14px; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1.2px;
+    margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .card h2 .step {
+    background: var(--primary); color: white; width: 22px; height: 22px;
+    border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px;
+  }
+
+  /* === Song picker === */
+  .songs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .song {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px; cursor: pointer;
+    transition: all 0.15s;
+  }
+  .song:hover { border-color: var(--primary); transform: translateY(-2px); }
+  .song.selected {
+    border-color: var(--primary);
+    background: linear-gradient(135deg, rgba(124,92,255,0.18), rgba(0,212,255,0.08));
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+  .song .title { font-weight: 700; font-size: 14px; }
+  .song .artist { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .song .diff {
+    margin-top: 8px; font-family: var(--mono); font-size: 10px;
+    color: var(--accent);
+  }
+
+  /* === Play visual === */
+  .play-area {
+    margin-top: 18px;
+    background: #06060c; border-radius: 12px; padding: 18px;
+    border: 1px solid var(--border);
+  }
+  .lanes {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 6px; height: 200px; position: relative; overflow: hidden;
+    border-radius: 8px; background: #03030a;
+  }
+  .lane {
+    position: relative; background: linear-gradient(180deg, transparent, rgba(124,92,255,0.05));
+    border-left: 1px solid rgba(255,255,255,0.04);
+  }
+  .lane:first-child { border-left: none; }
+  .hit-line {
+    position: absolute; bottom: 24px; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    box-shadow: 0 0 12px var(--accent);
+  }
+  .note {
+    position: absolute; left: 8%; right: 8%; height: 16px;
+    border-radius: 4px;
+    background: linear-gradient(180deg, var(--primary-soft), var(--primary));
+    box-shadow: 0 0 12px rgba(124,92,255,0.6);
+  }
+  .note.hit-perfect { background: linear-gradient(180deg, #6effb6, var(--success)); }
+  .note.hit-good { background: linear-gradient(180deg, #ffd479, var(--warn)); }
+  .note.hit-miss { background: linear-gradient(180deg, #ff8a9d, var(--danger)); opacity: 0.4; }
+
+  .play-controls {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 14px;
+  }
+  .progress-bar {
+    flex: 1; height: 8px; background: var(--bg-2); border-radius: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent));
+    width: 0%; transition: width 0.2s;
+  }
+
+  /* === Score panel === */
+  .score-display {
+    text-align: center; padding: 24px 0;
+  }
+  .score-number {
+    font-family: var(--mono); font-size: 64px; font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--primary));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+  .score-label { color: var(--muted); font-size: 12px; margin-top: 6px; letter-spacing: 2px; }
+  .judges { display: flex; justify-content: center; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+  .judge {
+    background: var(--bg-2); border-radius: 8px; padding: 6px 12px;
+    font-size: 12px; font-family: var(--mono);
+  }
+  .judge .v { font-weight: 700; margin-left: 6px; }
+  .judge.perfect .v { color: var(--success); }
+  .judge.good .v { color: var(--warn); }
+  .judge.miss .v { color: var(--danger); }
+
+  /* === AI feedback === */
+  .ai-bubble {
+    background: linear-gradient(135deg, rgba(124,92,255,0.12), rgba(0,212,255,0.06));
+    border: 1px solid rgba(124,92,255,0.3);
+    border-radius: 12px; padding: 16px;
+    font-size: 14px; min-height: 64px;
+    position: relative;
+  }
+  .ai-bubble.thinking { color: var(--muted); font-style: italic; }
+  .ai-bubble .who {
+    font-size: 11px; color: var(--primary-soft); font-weight: 700;
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px;
+  }
+
+  /* === MCP log === */
+  .mcp-log {
+    background: #06060c; border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px; font-family: var(--mono); font-size: 12px;
+    height: 180px; overflow-y: auto; line-height: 1.7;
+  }
+  .mcp-log .row { display: flex; gap: 8px; }
+  .mcp-log .ts { color: var(--muted); flex-shrink: 0; }
+  .mcp-log .info { color: var(--accent); }
+  .mcp-log .ok { color: var(--success); }
+  .mcp-log .warn { color: var(--warn); }
+  .mcp-log .err { color: var(--danger); }
+  .mcp-log .tool { color: var(--primary-soft); }
+
+  /* === Wallet === */
+  .wallet-card {
+    background: linear-gradient(135deg, #1a1535, #0f1428);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; margin-bottom: 16px;
+  }
+  .wallet-addr {
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+  }
+  .wallet-addr .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); }
+  .wallet-balance {
+    display: flex; align-items: baseline; gap: 8px;
+  }
+  .wallet-balance .num {
+    font-family: var(--mono); font-size: 36px; font-weight: 800;
+    color: var(--accent);
+  }
+  .wallet-balance .sym { color: var(--muted); font-size: 14px; font-weight: 600; }
+
+  /* === Shop === */
+  .shop { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .skin {
+    background: var(--bg-2); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px; position: relative;
+    overflow: hidden;
+  }
+  .skin-art {
+    height: 80px; border-radius: 8px; margin-bottom: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+  }
+  .skin-art.gold { background: linear-gradient(135deg, #f5d976, #b88a2a); }
+  .skin-art.neon { background: linear-gradient(135deg, #ff3ea8, #00d4ff); }
+  .skin-art.crystal { background: linear-gradient(135deg, #a8e0ff, #d4b8ff); }
+  .skin-art.shadow { background: linear-gradient(135deg, #3a2e5e, #1a1535); }
+  .skin .name { font-weight: 700; font-size: 13px; }
+  .skin .price {
+    font-family: var(--mono); font-size: 13px; color: var(--accent);
+    margin-top: 4px; margin-bottom: 8px;
+  }
+  .skin.owned::after {
+    content: 'OWNED'; position: absolute; top: 8px; right: 8px;
+    background: var(--success); color: #0a0a14; font-size: 10px;
+    padding: 2px 8px; border-radius: 4px; font-weight: 700;
+  }
+  .skin button { width: 100%; padding: 8px; font-size: 12px; }
+
+  .pill {
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    background: var(--bg-2); color: var(--muted);
+  }
+  .pill.live { background: rgba(45,212,164,0.15); color: var(--success); }
+  .pill.demo { background: rgba(124,92,255,0.15); color: var(--primary-soft); }
+
+  .tx-link {
+    color: var(--accent); text-decoration: none; font-family: var(--mono);
+    font-size: 11px; border-bottom: 1px dashed var(--accent);
+  }
+
+  .footer-note {
+    margin-top: 24px; padding: 16px; font-size: 12px; color: var(--muted);
+    border-radius: 10px; background: var(--bg-1); border: 1px solid var(--border);
+  }
+  .footer-note code {
+    font-family: var(--mono); background: var(--bg-2); padding: 1px 6px;
+    border-radius: 4px; color: var(--accent);
+  }
+
+  .row-actions { display: flex; gap: 10px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">M</div>
+    <div>
+      <h1>MURANG Studio</h1>
+      <p>VR 리듬게임 × Web3 보상 시스템 데모</p>
+    </div>
+  </div>
+  <div class="wallet-area">
+    <div class="mode-toggle" id="modeToggle">
+      <button data-mode="demo" class="active">DEMO</button>
+      <button data-mode="live">LIVE (Sepolia)</button>
+    </div>
+    <button class="btn btn-ghost" id="walletBtn">지갑 연결</button>
+  </div>
+</header>
+
+<div class="grid">
+  <!-- LEFT COLUMN: PLAY → SCORE → AI → MCP -->
+  <div>
+    <!-- Step 1: Song & Play -->
+    <div class="card">
+      <h2><span class="step">1</span> 곡 선택 & VR 연주</h2>
+      <div class="songs" id="songs"></div>
+
+      <div class="play-area">
+        <div class="lanes" id="lanes">
+          <div class="lane"></div><div class="lane"></div>
+          <div class="lane"></div><div class="lane"></div>
+          <div class="hit-line"></div>
+        </div>
+        <div class="play-controls">
+          <button class="btn btn-primary" id="playBtn">▶ 연주 시작</button>
+          <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+          <span class="pill" id="playStatus">대기 중</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Score & AI -->
+    <div class="card" style="margin-top:20px;">
+      <h2><span class="step">2</span> 채점 · AI 피드백</h2>
+      <div class="score-display">
+        <div class="score-number" id="scoreNum">--</div>
+        <div class="score-label">ACCURACY SCORE</div>
+        <div class="judges" id="judges" style="display:none;">
+          <div class="judge perfect">PERFECT<span class="v" id="jPerfect">0</span></div>
+          <div class="judge good">GOOD<span class="v" id="jGood">0</span></div>
+          <div class="judge miss">MISS<span class="v" id="jMiss">0</span></div>
+        </div>
+      </div>
+      <div class="ai-bubble thinking" id="aiBubble">
+        <div class="who">🎸 BAND MASTER AI</div>
+        <span id="aiText">연주가 끝나면 피드백을 들려드릴게요.</span>
+      </div>
+    </div>
+
+    <!-- Step 3: MCP & Token -->
+    <div class="card" style="margin-top:20px;">
+      <h2><span class="step">3</span> MCP → 스마트 컨트랙트</h2>
+      <div class="mcp-log" id="mcpLog">
+        <div class="row"><span class="ts">--:--:--</span><span>MCP 서버 대기 중…</span></div>
+      </div>
+      <div class="row-actions">
+        <button class="btn btn-success" id="claimBtn" disabled>💎 토큰 보상 받기 (MCP)</button>
+        <button class="btn btn-ghost" id="resetBtn">↺ 초기화</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN: WALLET + SHOP -->
+  <div>
+    <div class="card">
+      <h2>지갑 잔고 <span class="pill demo" id="netPill" style="margin-left:auto;">DEMO MODE</span></h2>
+      <div class="wallet-card">
+        <div class="wallet-addr">
+          <span class="dot"></span><span id="walletAddr">미연결</span>
+        </div>
+        <div class="wallet-balance">
+          <span class="num" id="balanceNum">0</span>
+          <span class="sym">MURANG</span>
+        </div>
+      </div>
+
+      <h2 style="margin-top: 8px;">소장 스킨</h2>
+      <div id="ownedList" style="font-size:12px; color: var(--muted); padding: 8px 0;">
+        아직 보유한 스킨이 없습니다.
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+      <h2>🛒 가상 악기 스킨 상점</h2>
+      <div class="shop" id="shop"></div>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+      <h2>📜 트랜잭션 히스토리</h2>
+      <div id="txHistory" style="font-size: 12px; color: var(--muted);">
+        아직 트랜잭션이 없습니다.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer-note">
+  <strong>📋 사용 방법</strong><br/>
+  · <strong>DEMO 모드</strong>: 지갑 연결 없이 즉시 전체 플로우(연주 → 채점 → AI → 토큰 → 구매)를 시뮬레이션합니다. 시연용으로 권장.<br/>
+  · <strong>LIVE 모드</strong>: MetaMask + Sepolia 네트워크로 실제 트랜잭션을 실행합니다. 배포된 ERC-20 컨트랙트 주소를 <code>CONFIG.contractAddress</code>에 넣어주세요.<br/>
+  · ERC-20 컨트랙트(<code>MURANGCoin.sol</code>)와 스킨 샵 컨트랙트(<code>SkinShop.sol</code>)는 <code>contracts/</code> 폴더에 함께 생성되어 있습니다 (Remix에서 그대로 배포 가능).
+</div>
+
+<script>
+// =====================================================================
+// CONFIG — 실제 Sepolia 배포 시 contractAddress 채우기
+// =====================================================================
+const CONFIG = {
+  tokenName: 'MURANG',
+  chainIdHex: '0xaa36a7', // Sepolia
+  chainName: 'Sepolia',
+  rewardPerScore: 1,           // 점수 1점당 1 MURANG
+  contractAddress: '0x55E8f2964a5c721f6004ccF4c00dCA806dCFfDA2',         // 예: '0x1234...abcd' (배포 후 채워주세요)
+  shopAddress: '0xc9E719725eCb237e20AD27A77F15faa883ba243D',             // 스킨 샵 컨트랙트 주소
+};
+
+// ERC-20 표준 ABI (잔고 확인 + 전송 + 승인 + mint)
+const ERC20_ABI = [
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+  "function decimals() view returns (uint8)",
+  "function balanceOf(address) view returns (uint256)",
+  "function transfer(address to, uint256 amount) returns (bool)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function mint(address to, uint256 amount) returns (bool)"
+];
+
+// SkinShop ABI
+const SHOP_ABI = [
+  "function purchase(string skinId)",
+  "function isOwner(address user, string skinId) view returns (bool)",
+  "function skins(bytes32 id) view returns (bool listed, uint256 price, uint256 totalSold)"
+];
+
+// =====================================================================
+// 곡 데이터 (실제 MIDI 가이드 데이터 형식 시뮬레이션)
+// =====================================================================
+const SONGS = [
+  {
+    id: 'song1',
+    title: 'Neon Pulse',
+    artist: 'Aurora Drive',
+    difficulty: 'EASY',
+    bpm: 120,
+    // [time(ms), lane(0-3)]
+    midi: generateMidi(40, 120, 'easy')
+  },
+  {
+    id: 'song2',
+    title: 'Quantum Strings',
+    artist: 'Lo-fi Cube',
+    difficulty: 'NORMAL',
+    bpm: 140,
+    midi: generateMidi(60, 140, 'normal')
+  },
+  {
+    id: 'song3',
+    title: 'Starlight Riff',
+    artist: 'MURANG Band',
+    difficulty: 'HARD',
+    bpm: 168,
+    midi: generateMidi(80, 168, 'hard')
+  },
+];
+
+function generateMidi(count, bpm, level) {
+  const beatMs = 60000 / bpm;
+  const interval = level === 'hard' ? beatMs / 2 : level === 'normal' ? beatMs * 0.75 : beatMs;
+  const arr = [];
+  for (let i = 0; i < count; i++) {
+    arr.push({ time: Math.round(i * interval) + 800, lane: Math.floor(Math.random() * 4) });
+  }
+  return arr;
+}
+
+// =====================================================================
+// 스킨 데이터
+// =====================================================================
+const SKINS = [
+  { id: 'gold', name: '골드 기타', price: 50, icon: '🎸', cls: 'gold' },
+  { id: 'neon', name: '네온 베이스', price: 80, icon: '🪕', cls: 'neon' },
+  { id: 'crystal', name: '크리스탈 드럼', price: 120, icon: '🥁', cls: 'crystal' },
+  { id: 'shadow', name: '섀도우 키보드', price: 200, icon: '🎹', cls: 'shadow' },
+];
+
+// =====================================================================
+// 상태
+// =====================================================================
+const state = {
+  mode: 'demo',           // 'demo' | 'live'
+  selectedSong: SONGS[0],
+  playing: false,
+  score: null,
+  judges: { perfect: 0, good: 0, miss: 0 },
+  rewardClaimed: false,
+  wallet: { address: null, balance: 0 },
+  owned: new Set(),
+  txs: [],
+  provider: null,
+  signer: null,
+  tokenContract: null,
+  shopContract: null,
+};
+
+// =====================================================================
+// 렌더링
+// =====================================================================
+function renderSongs() {
+  const el = document.getElementById('songs');
+  el.innerHTML = SONGS.map(s => `
+    <div class="song ${s.id === state.selectedSong.id ? 'selected' : ''}" data-id="${s.id}">
+      <div class="title">${s.title}</div>
+      <div class="artist">${s.artist}</div>
+      <div class="diff">[${s.difficulty}] ${s.bpm} BPM · ${s.midi.length} notes</div>
+    </div>
+  `).join('');
+  el.querySelectorAll('.song').forEach(node => {
+    node.onclick = () => {
+      if (state.playing) return;
+      state.selectedSong = SONGS.find(s => s.id === node.dataset.id);
+      renderSongs();
+    };
+  });
+}
+
+function renderShop() {
+  const el = document.getElementById('shop');
+  el.innerHTML = SKINS.map(s => {
+    const owned = state.owned.has(s.id);
+    const canBuy = state.wallet.balance >= s.price && !owned;
+    return `
+      <div class="skin ${owned ? 'owned' : ''}">
+        <div class="skin-art ${s.cls}">${s.icon}</div>
+        <div class="name">${s.name}</div>
+        <div class="price">${s.price} ${CONFIG.tokenName}</div>
+        <button class="btn ${owned ? 'btn-ghost' : 'btn-primary'}"
+          data-id="${s.id}" ${!canBuy || owned ? 'disabled' : ''}>
+          ${owned ? '보유 중' : '구매하기'}
+        </button>
+      </div>
+    `;
+  }).join('');
+  el.querySelectorAll('button[data-id]').forEach(btn => {
+    btn.onclick = () => buySkin(btn.dataset.id);
+  });
+  renderOwned();
+}
+
+function renderOwned() {
+  const el = document.getElementById('ownedList');
+  if (state.owned.size === 0) {
+    el.textContent = '아직 보유한 스킨이 없습니다.';
+    return;
+  }
+  el.innerHTML = [...state.owned].map(id => {
+    const s = SKINS.find(x => x.id === id);
+    return `<span class="pill" style="margin-right:6px;">${s.icon} ${s.name}</span>`;
+  }).join('');
+}
+
+function renderWallet() {
+  document.getElementById('balanceNum').textContent = state.wallet.balance;
+  document.getElementById('walletAddr').textContent = state.wallet.address
+    ? shortenAddr(state.wallet.address)
+    : '미연결';
+  document.getElementById('walletBtn').textContent = state.wallet.address
+    ? '연결됨'
+    : '지갑 연결';
+
+  const pill = document.getElementById('netPill');
+  if (state.mode === 'live') {
+    pill.className = 'pill live'; pill.textContent = 'LIVE · Sepolia';
+  } else {
+    pill.className = 'pill demo'; pill.textContent = 'DEMO MODE';
+  }
+}
+
+function renderTxHistory() {
+  const el = document.getElementById('txHistory');
+  if (state.txs.length === 0) {
+    el.textContent = '아직 트랜잭션이 없습니다.';
+    return;
+  }
+  el.innerHTML = state.txs.slice().reverse().map(tx => `
+    <div style="padding:8px 0; border-bottom:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;">
+        <strong style="color:var(--text);">${tx.type}</strong>
+        <span style="color:${tx.amount > 0 ? 'var(--success)' : 'var(--danger)'}; font-family:var(--mono);">
+          ${tx.amount > 0 ? '+' : ''}${tx.amount} ${CONFIG.tokenName}
+        </span>
+      </div>
+      <div style="font-size:11px; margin-top:2px;">
+        ${tx.hash
+          ? `<a class="tx-link" href="https://sepolia.etherscan.io/tx/${tx.hash}" target="_blank">${shortenHash(tx.hash)} ↗</a>`
+          : `<span style="color:var(--muted);">DEMO TX · ${tx.fakeHash}</span>`}
+      </div>
+    </div>
+  `).join('');
+}
+
+function shortenAddr(a) { return a.slice(0, 6) + '...' + a.slice(-4); }
+function shortenHash(h) { return h.slice(0, 10) + '...' + h.slice(-8); }
+function fakeHash() {
+  return '0x' + Array.from({length: 40}, () => Math.floor(Math.random()*16).toString(16)).join('');
+}
+
+// =====================================================================
+// MCP 로그
+// =====================================================================
+function mcpLog(msg, type = 'info') {
+  const el = document.getElementById('mcpLog');
+  const ts = new Date().toTimeString().slice(0, 8);
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `<span class="ts">${ts}</span><span class="${type}">${msg}</span>`;
+  el.appendChild(row);
+  el.scrollTop = el.scrollHeight;
+}
+
+// =====================================================================
+// 연주 시뮬레이션 (4-lane 노트 떨어짐 + 자동 채점)
+// =====================================================================
+async function startPlay() {
+  if (state.playing) return;
+  state.playing = true;
+  state.score = null;
+  state.judges = { perfect: 0, good: 0, miss: 0 };
+  state.rewardClaimed = false;
+  document.getElementById('claimBtn').disabled = true;
+  document.getElementById('judges').style.display = 'none';
+  document.getElementById('scoreNum').textContent = '--';
+  document.getElementById('aiText').textContent = '연주 중… 박자에 집중!';
+  document.getElementById('aiBubble').classList.add('thinking');
+  document.getElementById('playBtn').disabled = true;
+  document.getElementById('playStatus').textContent = '연주 중';
+
+  const lanes = document.getElementById('lanes');
+  lanes.querySelectorAll('.note').forEach(n => n.remove());
+
+  const midi = state.selectedSong.midi;
+  const totalMs = midi[midi.length - 1].time + 1500;
+  const start = performance.now();
+
+  // 노트 스케줄링
+  midi.forEach(note => {
+    setTimeout(() => spawnNote(note.lane), note.time);
+  });
+
+  // 진행률 업데이트
+  const interval = setInterval(() => {
+    const elapsed = performance.now() - start;
+    const pct = Math.min(100, (elapsed / totalMs) * 100);
+    document.getElementById('progress').style.width = pct + '%';
+    if (elapsed >= totalMs) {
+      clearInterval(interval);
+      finishPlay();
+    }
+  }, 50);
+}
+
+function spawnNote(lane) {
+  const laneEl = document.getElementById('lanes').children[lane];
+  const note = document.createElement('div');
+  note.className = 'note';
+  note.style.top = '-20px';
+  laneEl.appendChild(note);
+
+  const travelMs = 1200;
+  const startT = performance.now();
+  const hitZone = 200 - 24 - 8;
+
+  // 시뮬레이션된 판정 (난이도별로 확률 조정)
+  const diffMap = { EASY: 0.85, NORMAL: 0.65, HARD: 0.5 };
+  const perfectRate = diffMap[state.selectedSong.difficulty] || 0.7;
+  const r = Math.random();
+  let judgment;
+  if (r < perfectRate) judgment = 'perfect';
+  else if (r < perfectRate + 0.20) judgment = 'good';
+  else judgment = 'miss';
+
+  function animate() {
+    const t = (performance.now() - startT) / travelMs;
+    if (t >= 1) {
+      // 판정 적용
+      if (judgment === 'perfect') {
+        note.classList.add('hit-perfect');
+        state.judges.perfect++;
+      } else if (judgment === 'good') {
+        note.classList.add('hit-good');
+        state.judges.good++;
+      } else {
+        note.classList.add('hit-miss');
+        state.judges.miss++;
+      }
+      setTimeout(() => note.remove(), 200);
+      return;
+    }
+    note.style.top = (t * hitZone) + 'px';
+    requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
+}
+
+function finishPlay() {
+  state.playing = false;
+  document.getElementById('playBtn').disabled = false;
+  document.getElementById('playStatus').textContent = '완료';
+
+  // 점수 계산
+  const total = state.judges.perfect + state.judges.good + state.judges.miss;
+  const raw = (state.judges.perfect * 100 + state.judges.good * 60) / total;
+  const score = Math.round(raw);
+  state.score = score;
+
+  document.getElementById('scoreNum').textContent = score;
+  document.getElementById('jPerfect').textContent = state.judges.perfect;
+  document.getElementById('jGood').textContent = state.judges.good;
+  document.getElementById('jMiss').textContent = state.judges.miss;
+  document.getElementById('judges').style.display = 'flex';
+
+  // AI 피드백
+  generateAIFeedback(score);
+
+  // 토큰 보상 활성화
+  document.getElementById('claimBtn').disabled = false;
+  document.getElementById('claimBtn').textContent =
+    `💎 ${score * CONFIG.rewardPerScore} ${CONFIG.tokenName} 보상 받기 (MCP)`;
+}
+
+// =====================================================================
+// AI 피드백 (LLM 시뮬레이션)
+// =====================================================================
+function generateAIFeedback(score) {
+  const j = state.judges;
+  let msg;
+
+  if (score >= 95) {
+    msg = `완벽한 연주였습니다! Perfect ${j.perfect}회, ${score}점에 걸맞은 풍성한 보상을 지급할게요. 🎯`;
+  } else if (score >= 85) {
+    msg = `훌륭한 연주예요. 박자감이 살아있네요 — Miss가 ${j.miss}개뿐이라니! ${score}점 인증합니다.`;
+  } else if (score >= 70) {
+    msg = `안정적인 흐름이었어요. Good 판정이 ${j.good}회 — 다음엔 Perfect로 끌어올려 볼까요? ${score}점 기록합니다.`;
+  } else if (score >= 50) {
+    msg = `리듬은 잡았지만 미스가 ${j.miss}회. 보상은 ${score} 토큰 — 연습하면 곧 골드 스킨도 살 수 있어요!`;
+  } else {
+    msg = `조금 어려웠죠? Miss ${j.miss}회를 줄이는 게 다음 목표! 그래도 ${score}점만큼 보상 드릴게요.`;
+  }
+
+  // 타이핑 효과
+  const bubble = document.getElementById('aiBubble');
+  const text = document.getElementById('aiText');
+  bubble.classList.remove('thinking');
+  text.textContent = '';
+  let i = 0;
+  const typer = setInterval(() => {
+    if (i >= msg.length) { clearInterval(typer); return; }
+    text.textContent += msg[i++];
+  }, 25);
+}
+
+// =====================================================================
+// MCP → 토큰 보상 (Tool Call)
+// =====================================================================
+async function claimReward() {
+  if (!state.score || state.rewardClaimed) return;
+  const amount = state.score * CONFIG.rewardPerScore;
+
+  mcpLog(`[MCP] Tool call: reward_token({ score: ${state.score}, amount: ${amount} })`, 'tool');
+  mcpLog(`[MCP] LLM 컨텍스트: "${state.selectedSong.title}" Perfect=${state.judges.perfect}, Good=${state.judges.good}, Miss=${state.judges.miss}`, 'info');
+
+  if (state.mode === 'live') {
+    await claimRewardLive(amount);
+  } else {
+    await claimRewardDemo(amount);
+  }
+}
+
+async function claimRewardDemo(amount) {
+  mcpLog(`[MCP] → Sepolia 네트워크 트랜잭션 전송 중...`, 'info');
+  await sleep(800);
+  const hash = fakeHash();
+  mcpLog(`[CHAIN] Pending: ${hash.slice(0,18)}...`, 'warn');
+  await sleep(1200);
+  mcpLog(`[CHAIN] ✓ Confirmed (block #${4_500_000 + Math.floor(Math.random()*1000)})`, 'ok');
+  mcpLog(`[CHAIN] +${amount} ${CONFIG.tokenName} → ${shortenAddr(state.wallet.address || '0xDemo...User')}`, 'ok');
+
+  state.wallet.balance += amount;
+  if (!state.wallet.address) state.wallet.address = '0xDemoUser0000000000000000000000000000Beef';
+  state.txs.push({ type: '리워드 수령', amount, fakeHash: hash, hash: null });
+  state.rewardClaimed = true;
+  document.getElementById('claimBtn').disabled = true;
+
+  renderWallet(); renderShop(); renderTxHistory();
+}
+
+async function claimRewardLive(amount) {
+  if (!state.tokenContract) {
+    mcpLog('[MCP] ✗ 컨트랙트 미설정 — CONFIG.contractAddress를 채워주세요.', 'err');
+    return;
+  }
+  try {
+    mcpLog(`[MCP] → tokenContract.mint(${shortenAddr(state.wallet.address)}, ${amount})`, 'tool');
+    const decimals = await state.tokenContract.decimals();
+    const tx = await state.tokenContract.mint(
+      state.wallet.address,
+      ethers.utils.parseUnits(amount.toString(), decimals)
+    );
+    mcpLog(`[CHAIN] Pending: ${tx.hash}`, 'warn');
+    const receipt = await tx.wait();
+    mcpLog(`[CHAIN] ✓ Confirmed (block #${receipt.blockNumber})`, 'ok');
+
+    const bal = await state.tokenContract.balanceOf(state.wallet.address);
+    state.wallet.balance = parseFloat(ethers.utils.formatUnits(bal, decimals));
+    state.txs.push({ type: '리워드 수령', amount, hash: tx.hash });
+    state.rewardClaimed = true;
+    document.getElementById('claimBtn').disabled = true;
+
+    renderWallet(); renderShop(); renderTxHistory();
+  } catch (e) {
+    mcpLog(`[CHAIN] ✗ 트랜잭션 실패: ${e.message || e}`, 'err');
+  }
+}
+
+// =====================================================================
+// 스킨 구매
+// =====================================================================
+async function buySkin(skinId) {
+  const skin = SKINS.find(s => s.id === skinId);
+  if (!skin || state.owned.has(skinId)) return;
+  if (state.wallet.balance < skin.price) {
+    mcpLog(`[SHOP] 잔고 부족 (필요: ${skin.price}, 보유: ${state.wallet.balance})`, 'err');
+    return;
+  }
+
+  mcpLog(`[SHOP] Tool call: buy_skin({ skin_id: "${skinId}", price: ${skin.price} })`, 'tool');
+
+  if (state.mode === 'live') {
+    await buySkinLive(skin);
+  } else {
+    await buySkinDemo(skin);
+  }
+}
+
+async function buySkinDemo(skin) {
+  mcpLog(`[CHAIN] approve(${skin.price}) → Pending...`, 'warn');
+  await sleep(700);
+  mcpLog(`[CHAIN] ✓ approve confirmed`, 'ok');
+  await sleep(400);
+  const hash = fakeHash();
+  mcpLog(`[CHAIN] SkinShop.purchase("${skin.id}") → Pending: ${hash.slice(0,18)}...`, 'warn');
+  await sleep(1000);
+  mcpLog(`[CHAIN] ✓ 구매 완료 — 소유권이 ${shortenAddr(state.wallet.address)}에게 이전됨`, 'ok');
+
+  state.wallet.balance -= skin.price;
+  state.owned.add(skin.id);
+  state.txs.push({ type: `${skin.name} 구매`, amount: -skin.price, fakeHash: hash, hash: null });
+
+  renderWallet(); renderShop(); renderTxHistory();
+}
+
+async function buySkinLive(skin) {
+  if (!CONFIG.shopAddress || !state.shopContract) {
+    mcpLog(`[CHAIN] ⚠ SkinShop 컨트랙트 미설정 — DEMO 동작으로 폴백`, 'warn');
+    await buySkinDemo(skin);
+    return;
+  }
+  try {
+    const decimals = await state.tokenContract.decimals();
+    const priceWei = ethers.utils.parseUnits(skin.price.toString(), decimals);
+
+    // 1) allowance 확인 후 approve (이미 충분하면 스킵)
+    const current = await state.tokenContract.allowance(state.wallet.address, CONFIG.shopAddress);
+    if (current.lt(priceWei)) {
+      mcpLog(`[CHAIN] approve(SkinShop, ${skin.price}) → Pending...`, 'tool');
+      const approveTx = await state.tokenContract.approve(CONFIG.shopAddress, priceWei);
+      mcpLog(`[CHAIN] tx ${approveTx.hash}`, 'warn');
+      await approveTx.wait();
+      mcpLog(`[CHAIN] ✓ approve confirmed`, 'ok');
+    } else {
+      mcpLog(`[CHAIN] allowance 충분 — approve 스킵`, 'info');
+    }
+
+    // 2) SkinShop.purchase(skinId)
+    mcpLog(`[CHAIN] SkinShop.purchase("${skin.id}") → Pending...`, 'tool');
+    const tx = await state.shopContract.purchase(skin.id);
+    mcpLog(`[CHAIN] tx ${tx.hash}`, 'warn');
+    const receipt = await tx.wait();
+    mcpLog(`[CHAIN] ✓ Confirmed (block #${receipt.blockNumber})`, 'ok');
+    mcpLog(`[CHAIN] 소유권이 ${shortenAddr(state.wallet.address)}에게 이전됨`, 'ok');
+
+    const bal = await state.tokenContract.balanceOf(state.wallet.address);
+    state.wallet.balance = parseFloat(ethers.utils.formatUnits(bal, decimals));
+    state.owned.add(skin.id);
+    state.txs.push({ type: `${skin.name} 구매`, amount: -skin.price, hash: tx.hash });
+
+    renderWallet(); renderShop(); renderTxHistory();
+  } catch (e) {
+    mcpLog(`[CHAIN] ✗ 구매 실패: ${(e.reason || e.message || e).toString().slice(0,120)}`, 'err');
+  }
+}
+
+// =====================================================================
+// 지갑 연결 (DEMO / LIVE)
+// =====================================================================
+async function connectWallet() {
+  if (state.mode === 'demo') {
+    state.wallet.address = '0xDemoUser' + fakeHash().slice(2, 34);
+    mcpLog(`[WALLET] 데모 지갑 생성: ${shortenAddr(state.wallet.address)}`, 'info');
+    renderWallet();
+    return;
+  }
+
+  if (typeof window.ethereum === 'undefined') {
+    alert('MetaMask가 설치되어 있지 않습니다. https://metamask.io 에서 설치해주세요.');
+    return;
+  }
+  try {
+    await window.ethereum.request({ method: 'eth_requestAccounts' });
+    // Sepolia로 스위치
+    try {
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: CONFIG.chainIdHex }],
+      });
+    } catch (switchErr) {
+      mcpLog(`[WALLET] Sepolia 스위치 실패: ${switchErr.message}`, 'warn');
+    }
+
+    state.provider = new ethers.providers.Web3Provider(window.ethereum);
+    state.signer = state.provider.getSigner();
+    state.wallet.address = await state.signer.getAddress();
+    mcpLog(`[WALLET] MetaMask 연결: ${shortenAddr(state.wallet.address)}`, 'ok');
+
+    if (CONFIG.contractAddress) {
+      state.tokenContract = new ethers.Contract(CONFIG.contractAddress, ERC20_ABI, state.signer);
+      try {
+        const decimals = await state.tokenContract.decimals();
+        const bal = await state.tokenContract.balanceOf(state.wallet.address);
+        state.wallet.balance = parseFloat(ethers.utils.formatUnits(bal, decimals));
+        mcpLog(`[WALLET] 토큰 잔고: ${state.wallet.balance} ${CONFIG.tokenName}`, 'ok');
+      } catch (e) {
+        mcpLog(`[WALLET] 잔고 조회 실패 (컨트랙트 주소 확인 필요): ${e.message}`, 'err');
+      }
+    } else {
+      mcpLog(`[WALLET] CONFIG.contractAddress 미설정 — 잔고는 시뮬레이션됨`, 'warn');
+    }
+
+    if (CONFIG.shopAddress) {
+      state.shopContract = new ethers.Contract(CONFIG.shopAddress, SHOP_ABI, state.signer);
+      mcpLog(`[WALLET] SkinShop 컨트랙트 연결: ${shortenAddr(CONFIG.shopAddress)}`, 'ok');
+      // 이미 소유한 스킨 동기화
+      for (const skin of SKINS) {
+        try {
+          const owns = await state.shopContract.isOwner(state.wallet.address, skin.id);
+          if (owns) state.owned.add(skin.id);
+        } catch (_) {}
+      }
+      renderShop();
+    }
+
+    renderWallet();
+  } catch (e) {
+    mcpLog(`[WALLET] 연결 실패: ${e.message}`, 'err');
+  }
+}
+
+// =====================================================================
+// 유틸
+// =====================================================================
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function resetAll() {
+  state.score = null;
+  state.judges = { perfect: 0, good: 0, miss: 0 };
+  state.rewardClaimed = false;
+  state.wallet.balance = 0;
+  state.owned.clear();
+  state.txs = [];
+  document.getElementById('scoreNum').textContent = '--';
+  document.getElementById('judges').style.display = 'none';
+  document.getElementById('progress').style.width = '0%';
+  document.getElementById('claimBtn').disabled = true;
+  document.getElementById('claimBtn').textContent = '💎 토큰 보상 받기 (MCP)';
+  document.getElementById('aiBubble').classList.add('thinking');
+  document.getElementById('aiText').textContent = '연주가 끝나면 피드백을 들려드릴게요.';
+  document.getElementById('playStatus').textContent = '대기 중';
+  document.getElementById('mcpLog').innerHTML = '';
+  mcpLog('초기화 완료. 다시 연주를 시작해주세요.', 'info');
+  renderWallet(); renderShop(); renderTxHistory();
+}
+
+// =====================================================================
+// 이벤트 바인딩
+// =====================================================================
+document.getElementById('playBtn').onclick = startPlay;
+document.getElementById('claimBtn').onclick = claimReward;
+document.getElementById('resetBtn').onclick = resetAll;
+document.getElementById('walletBtn').onclick = connectWallet;
+
+document.querySelectorAll('#modeToggle button').forEach(b => {
+  b.onclick = () => {
+    if (state.playing) return;
+    state.mode = b.dataset.mode;
+    document.querySelectorAll('#modeToggle button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.wallet = { address: null, balance: 0 };
+    state.tokenContract = null;
+    state.shopContract = null;
+    state.provider = null;
+    state.signer = null;
+    renderWallet(); renderShop();
+    mcpLog(`[SYSTEM] 모드 변경: ${state.mode.toUpperCase()}`, 'info');
+  };
+});
+
+// 초기 렌더
+renderSongs();
+renderShop();
+renderWallet();
+renderTxHistory();
+mcpLog('MCP 서버 준비 완료. DEMO 모드에서 즉시 시연하거나, LIVE 모드로 Sepolia에 연결할 수 있습니다.', 'info');
+</script>
+</body>
+</html>
