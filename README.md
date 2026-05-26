@@ -1,15 +1,58 @@
-# 가상 가치 순환을 위한 Web3 기반 VR 리듬게임 보상 시스템
+# 🎸 MURANG · Play2Mint
 
-> **MURANG Studio** · 텀 프로젝트 제안서
-> 작성일: 2026-05-26
+> **"VR 가상 스튜디오에서 원곡 악보(MIDI)대로 정확히 연주하면 토큰을 보상받고, 이 토큰으로 나만의 가상 악기 스킨을 구매하는 체감형 Web3 에코시스템"**
+
+![Solidity](https://img.shields.io/badge/Solidity-0.8.20-363636?logo=solidity)
+![Network](https://img.shields.io/badge/Network-Sepolia-blue)
+![Hardhat](https://img.shields.io/badge/Hardhat-2.22-yellow)
+![ethers.js](https://img.shields.io/badge/ethers.js-v5%20%2F%20v6-purple)
+
+플레이어는 가상 스튜디오에서 곡을 연주하고, 정확도에 비례한 ERC-20 토큰을 자동으로 지급받는다. 모인 토큰은 그 자리에서 가상 악기 스킨 구매에 사용되며, 모든 보상·소비 흐름이 온체인에 기록된다.
 
 ---
+
+## 🌐 Live Deployment (Sepolia)
+
+| 컨트랙트 | 주소 | Etherscan |
+|---|---|---|
+| **MURANGCoin (ERC-20)** | `0x55E8f2964a5c721f6004ccF4c00dCA806dCFfDA2` | [↗](https://sepolia.etherscan.io/address/0x55E8f2964a5c721f6004ccF4c00dCA806dCFfDA2) |
+| **SkinShop** | `0xc9E719725eCb237e20AD27A77F15faa883ba243D` | [↗](https://sepolia.etherscan.io/address/0xc9E719725eCb237e20AD27A77F15faa883ba243D) |
+| **Deployer** | `0xEb896526c326bB06b6d224a364eD9072153d9C4F` | [↗](https://sepolia.etherscan.io/address/0xEb896526c326bB06b6d224a364eD9072153d9C4F) |
+
+---
+
+## ⚡ Quick Start
+
+```bash
+# 1. 의존성 설치
+npm install
+
+# 2. 환경 변수 설정
+cp .env.example .env
+# .env 파일을 열어 PRIVATE_KEY 입력 (테스트 전용 지갑만!)
+
+# 3. Sepolia 배포 — index.html에 컨트랙트 주소 자동 주입
+npm run deploy
+
+# 4. 로컬 서버 실행 (MetaMask는 file:// 에서 불안정)
+python3 -m http.server 8080
+# → http://localhost:8080 접속
+```
+
+브라우저에서:
+1. 우측 상단 토글 → **LIVE (Sepolia)** 선택
+2. **지갑 연결** → MetaMask에서 배포자 계정 선택
+3. 곡 선택 → ▶ 연주 → 💎 보상 받기 → 🛒 스킨 구매
+
+> 💡 **네트워크 장애 폴백**: 우측 상단 토글을 **DEMO**로 바꾸면 지갑·체인 연결 없이 전체 흐름이 시뮬레이션으로 작동합니다. 발표 안정성을 위한 이중 트랙.
+
+---
+
+# 📖 Project Proposal
 
 ## 1. 한 줄 요약
 
 > **"VR 가상 스튜디오에서 원곡 악보(MIDI)대로 정확히 연주하면 토큰을 보상받고, 이 토큰으로 나만의 가상 악기 스킨을 구매하는 체감형 Web3 에코시스템"**
-
-플레이어는 가상 스튜디오에서 곡을 연주하고, 정확도에 비례한 ERC-20 토큰을 자동으로 지급받는다. 모인 토큰은 그 자리에서 가상 악기 스킨 구매에 사용되며, 모든 보상·소비 흐름이 온체인에 기록된다.
 
 ---
 
@@ -130,15 +173,7 @@
 
 ## 6. 5/26 시연 시나리오 — 실제 구현 결과
 
-### 6.1 배포된 컨트랙트 (Sepolia)
-
-| | 주소 | Etherscan |
-|---|---|---|
-| **MURANGCoin** | `0x55E8f2964a5c721f6004ccF4c00dCA806dCFfDA2` | [↗](https://sepolia.etherscan.io/address/0x55E8f2964a5c721f6004ccF4c00dCA806dCFfDA2) |
-| **SkinShop** | `0xc9E719725eCb237e20AD27A77F15faa883ba243D` | [↗](https://sepolia.etherscan.io/address/0xc9E719725eCb237e20AD27A77F15faa883ba243D) |
-| **Deployer** | `0xEb896526c326bB06b6d224a364eD9072153d9C4F` | [↗](https://sepolia.etherscan.io/address/0xEb896526c326bB06b6d224a364eD9072153d9C4F) |
-
-### 6.2 등록된 스킨
+### 6.1 등록된 스킨
 
 | Skin ID | 가격 (MURANG) | 컨셉 |
 |---|---|---|
@@ -147,7 +182,7 @@
 | `crystal` | 120 | 크리스탈 드럼 |
 | `shadow` | 200 | 섀도우 키보드 |
 
-### 6.3 시연 흐름 (LIVE 모드)
+### 6.2 시연 흐름 (LIVE 모드)
 
 | Step | 화면 | 온체인 |
 |---|---|---|
@@ -159,7 +194,7 @@
 | 6. 골드 기타 구매 | MetaMask 팝업 2회 | **`approve` + `SkinShop.purchase("gold")`** |
 | 7. 결과 확인 | OWNED 배지, 잔고 `83 → 33` | Etherscan에서 두 트랜잭션 확인 |
 
-### 6.4 폴백 — DEMO 모드
+### 6.3 폴백 — DEMO 모드
 
 네트워크 장애나 가스 부족 등 발표 중 변수가 발생할 경우, 우측 상단 토글로 **DEMO 모드** 전환 시 전체 흐름이 시뮬레이션된 트랜잭션으로 작동. 시연 안정성을 위해 의도된 이중 트랙.
 
@@ -168,14 +203,13 @@
 ## 7. 파일 구조
 
 ```
-과제/
-├── PROPOSAL.md              ← 본 문서
+murang_-play2mint/
+├── README.md                ← 본 문서
 ├── index.html               ← 단일 페이지 프론트엔드 (DEMO/LIVE 둘 다 지원)
 ├── package.json
 ├── hardhat.config.js
 ├── .env.example             ← 키 템플릿 (.env는 gitignore)
 ├── .gitignore
-├── deployment.json          ← 배포 결과 자동 기록
 │
 ├── contracts/
 │   ├── MURANGCoin.sol       ← ERC-20 보상 토큰
@@ -190,40 +224,12 @@
 
 ---
 
-## 8. 실행 방법
-
-### 8.1 사전 준비
-- Node.js 18+ (테스트: v25 동작 확인)
-- MetaMask 브라우저 확장
-- Sepolia ETH (faucet에서 발급)
-
-### 8.2 설치 & 배포
+## 8. 부가 스크립트
 
 ```bash
-# 1. 의존성 설치
-npm install
+# 배포자 지갑 Sepolia 잔고 확인
+npm run balance
 
-# 2. 환경 변수 설정
-cp .env.example .env
-# .env 파일을 열어 PRIVATE_KEY 입력 (테스트 전용 지갑만!)
-
-# 3. Sepolia 배포 — index.html에 주소 자동 주입
-npm run deploy
-
-# 4. 로컬 서버 실행 (MetaMask는 file://에서 불안정)
-python3 -m http.server 8080
-# → http://localhost:8080 접속
-```
-
-### 8.3 시연
-
-1. 우측 상단 토글 → **LIVE (Sepolia)**
-2. **지갑 연결** → MetaMask에서 배포자 계정 선택
-3. 곡 선택 → ▶ 연주 → 보상 → 구매 순으로 진행
-
-### 8.4 부가 스크립트
-
-```bash
 # 다른 MetaMask 지갑에 mint 권한 부여 (시연 지갑이 배포자와 다를 때)
 NEW_REWARDER=0x... npx hardhat run scripts/authorize.js --network sepolia
 
@@ -281,3 +287,9 @@ RECIPIENT=0x... AMOUNT_ETH=0.05 npx hardhat run scripts/topup.js --network sepol
 본 프로젝트는 **"Web3가 어떻게 게임 UX를 강화할 수 있는가"** 라는 질문에 대한 작동하는 답안이다. ERC-20 토큰 발행과 스마트 컨트랙트 기반 소유권 이전이라는 기본 블록을 활용하여, 게이머가 인지하지 못한 채로 자연스럽게 온체인 자산을 축적·소비하는 경험을 설계했다.
 
 실제 Sepolia 테스트넷에 컨트랙트를 배포하고 트랜잭션을 발생시킴으로써, **제안이 아닌 동작하는 시스템**으로 증명한다는 점이 본 프로젝트의 가장 큰 차별점이다.
+
+---
+
+## License
+
+Term project — MIT (or as required by course).
